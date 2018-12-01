@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.UI;
 using UnityEngine;
 
 public class MiniBotsManager : MonoBehaviour {
@@ -29,16 +30,19 @@ public class MiniBotsManager : MonoBehaviour {
 	[SerializeField] private int NumberOfWalkBots;
 	[SerializeField] private Transform SpawnPostion;
 	[SerializeField] private float TimePerSpawn;
-
+	[SerializeField] private float startTime = 60;
+	[SerializeField] private Text Time;
 
 	private TimeState timeState;
 	private ActionState actionState;
 	private int walkBotAlive;
 	private bool clear;
+	private bool isActing;
 	Bot bot;
 	ArrayList walkBots;
 
 	void Start () {
+		Time.text = startTime.ToString();
 		timeState = TimeState.Play;
 		actionState = ActionState.None;
 		if (WalkBotPrefab == null || CursorPrefab == null)
@@ -53,6 +57,7 @@ public class MiniBotsManager : MonoBehaviour {
 			StartCoroutine(CreateBot(i * TimePerSpawn, BotType.Walk));
 		}
 		clear = true;
+		StartCoroutine(Wait(1));
 	}
 	
 	
@@ -138,7 +143,7 @@ public class MiniBotsManager : MonoBehaviour {
 					{
 						Bot tempBot = (Bot)walkBots[i];
 						GameObject tempCursor = Instantiate(CursorPrefab);
-						tempCursor.transform.parent = canvas.transform;
+						tempCursor.transform.SetParent(canvas.transform);
 						tempBot.SetCursor(tempCursor);
 					}					
 				} break;
@@ -147,7 +152,7 @@ public class MiniBotsManager : MonoBehaviour {
 	private void CreateCursorOnBot(Bot bot, GameObject cursorPrefab)
 	{
 		GameObject tempCursor = Instantiate(cursorPrefab);
-		tempCursor.transform.parent = canvas.transform;
+		tempCursor.transform.SetParent(canvas.transform);
 		bot.SetCursor(tempCursor);
 	}
 	IEnumerator CreateBot(float time, BotType type)
@@ -161,7 +166,7 @@ public class MiniBotsManager : MonoBehaviour {
 			case BotType.Walk:
 				{
 					GameObject walkBot = Instantiate(WalkBotPrefab);
-					Bot bot = new Bot(walkBot, SpawnPostion, BotType.Walk);
+					Bot bot = new Bot(walkBot, SpawnPostion);
 					if (!bot.Validate()) { print("Could not create bot"); }
 					switch (actionState)
 					{
@@ -176,8 +181,40 @@ public class MiniBotsManager : MonoBehaviour {
 		}
 
 	}
-
-
+	IEnumerator Wait(float time)
+	{
+		yield return new WaitForSeconds(time);
+		Time.text = (--startTime).ToString();
+		StartCoroutine(Wait(time));
+	}
+	private int FindBot(GameObject id, BotType type)
+	{
+		switch (type)
+		{
+			case BotType.None: return -1;
+			case BotType.All: return -1;
+			case BotType.Mini: return -1;
+			case BotType.Walk:
+				{
+					for (int i = 0; i < walkBots.Count; i++)
+					{
+						Bot temp = (Bot)walkBots[i];
+						GameObject tempObj = temp.GetGameObject();
+						if (id == tempObj)
+							return i;
+					}
+				}break;
+		}
+		return -1;
+	}
+	public void AddForceToBot(GameObject id, BotType type, Vector3 direction, float VerticalForce, float HorizontalForce)
+	{
+		int pos = FindBot(id, type);
+		if (pos != -1)
+		{
+			((Bot)(walkBots[pos])).JumpLaunch(direction, VerticalForce, HorizontalForce);
+		}
+	}
 
 	/* <Summary>
 		 Contains all public functions for UI commands

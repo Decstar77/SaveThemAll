@@ -11,13 +11,19 @@ public class CameraScript : MonoBehaviour {
 	[SerializeField] float ZoomInc = 0.5f;
 	[SerializeField] GameObject CameraBounds;
 
-	BoxCollider cameraBox;
+	MeshCollider cameraColliderBounds;
 	Vector3 touchStart;
 	Vector3 touchEnd;
 	Vector3 panningVelocity;
 	Vector3 zoomVelocity;
+	Vector3 startPos;
+	Vector3 backScrollDirection;
+	Vector3 backScrollStopPoint;
+
 	void Start () {
-		cameraBox = CameraBounds.GetComponent<BoxCollider>();
+		cameraColliderBounds = CameraBounds.GetComponent<MeshCollider>();
+		startPos = transform.position;
+		BoundingBox();
 	}
 
 	void Update()
@@ -26,15 +32,15 @@ public class CameraScript : MonoBehaviour {
 		Vector3 dir = Vector3.zero;
 		if (Input.GetMouseButtonDown(0))
 		{
-			touchStart = GetWorldPositionOnPlane(Input.mousePosition, 0);
+			touchStart = UtilitFunctions.GetWorldPositionOnPlane(Input.mousePosition, 0);
 		}
 		if (Input.GetMouseButtonUp(0))
 		{
-			touchEnd = GetWorldPositionOnPlane(Input.mousePosition, 0);
+			touchEnd = UtilitFunctions.GetWorldPositionOnPlane(Input.mousePosition, 0);
 		}
 		if (Input.GetMouseButton(0))
 		{
-			dir = touchStart - GetWorldPositionOnPlane(Input.mousePosition, 0);
+			dir = touchStart - UtilitFunctions.GetWorldPositionOnPlane(Input.mousePosition, 0);
 			panningVelocity = dir * acceleration;
 		}
 		else
@@ -64,6 +70,8 @@ public class CameraScript : MonoBehaviour {
 		if (zoomAmount != 0) { zoomVelocity = Zoom(Input.mousePosition, zoomAmount) * ZoomSpeedMultiplier; }
 		#endregion
 
+		
+		
 
 		CheckBounds();
 		gameObject.transform.Translate(Vector3.right * panningVelocity.x);
@@ -75,49 +83,91 @@ public class CameraScript : MonoBehaviour {
 	Then creats a Plane with vec3.z = z
 	Then returns the distance of which the ray collides with the plane
 	<Summary>*/
-	public Vector3 GetWorldPositionOnPlane(Vector3 screenPosition, float z)
-	{
-		Ray ray = Camera.main.ScreenPointToRay(screenPosition);
-		Plane xy = new Plane(Vector3.forward, new Vector3(0, 0, z));
-		float distance;
-		xy.Raycast(ray, out distance);
-		return ray.GetPoint(distance);
-	}
-	public Vector3 Zoom(Vector3 pos, float x)
+
+
+	public Vector3 NewZoom(Vector3 pos, float x)
 	{
 		Ray ray = Camera.main.ScreenPointToRay(pos);
 		Vector3 currentpos = gameObject.transform.position;
 		Vector3 futurePos = ray.GetPoint(x);
-		if (x > 0)
-		{
+		if (x > 0) { return futurePos - currentpos; }
 
-			return futurePos - currentpos;
-		}
-		return currentpos - futurePos;
+		Ray backRay = new Ray(CameraBounds.transform.position, backScrollDirection);
 		
+		return Vector3.zero;
+
+	}
+	public Vector3 Zoom(Vector3 pos, float x)
+	{ 
+		Ray ray = Camera.main.ScreenPointToRay(pos);
+		Vector3 currentpos = gameObject.transform.position;
+		Vector3 futurePos = ray.GetPoint(x);
+		if (x > 0) { return futurePos - currentpos;	}
+		Debug.DrawRay(transform.position, startPos - transform.position, Color.red);
+		Ray nRay = new Ray(transform.position, startPos - transform.position);
+		Vector3 vec = nRay.GetPoint(x);
+		vec.Set(0, currentpos.y - vec.y, currentpos.z - vec.z);
+		return vec;
+
+	}
+	public void BoundingBox()
+	{
+		backScrollDirection = CameraBounds.transform.TransformVector(Vector3.up);
+		Ray r = new Ray(CameraBounds.transform.position, backScrollDirection);
+		RaycastHit rr;
+		if (cameraColliderBounds.Raycast(r, out rr, Mathf.Infinity))
+		{
+			print("Founds");
+			print(rr.point);
+		}
+		Debug.DrawRay(CameraBounds.transform.position, backScrollDirection);
 	}
 	public void CheckBounds()
 	{
+
 		Vector3 posToCheck = transform.position + panningVelocity;
-		Vector3 offset = cameraBox.bounds.center - posToCheck;
+		Vector3 offset = cameraColliderBounds.bounds.center - posToCheck;
 		Ray inputRay = new Ray(posToCheck, offset.normalized);
 		RaycastHit rHit;
 		Debug.DrawRay(posToCheck, offset);
-
-		if (cameraBox.Raycast(inputRay, out rHit, offset.magnitude * 1.1f))
+		
+		if (cameraColliderBounds.Raycast(inputRay, out rHit, offset.magnitude * 1.0f))
 		{
-			panningVelocity = Vector3.zero;
+			Vector3 hit = rHit.point;
+			float check = CameraBounds.transform.position.x + cameraColliderBounds.bounds.size.x/2;
+			float check1 = CameraBounds.transform.position.x - cameraColliderBounds.bounds.size.x/2;
+			if (transform.position.x > CameraBounds.transform.position.x)
+			{
+				if (hit.x < check)
+				{
+					panningVelocity.y = 0;
+				}
+			}
+			else
+			{
+				if (hit.x > check1)
+				{
+					panningVelocity.y = 0;
+				}
+			}
+			if (transform.position.x + panningVelocity.x > check)
+			{	
+				panningVelocity.x = 0;
+			}
+			if (transform.position.x + panningVelocity.x < check1)
+			{
+				panningVelocity.x = 0;
+			}
 		}
-
 
 		posToCheck = transform.position + zoomVelocity;
-		offset = cameraBox.bounds.center - posToCheck;
+		offset = cameraColliderBounds.bounds.center - posToCheck;
 		inputRay = new Ray(posToCheck, offset.normalized);
-
-		if(cameraBox.Raycast(inputRay, out rHit, offset.magnitude * 1.1f))
+		
+		if(cameraColliderBounds.Raycast(inputRay, out rHit, offset.magnitude * 1.1f))
 		{
-			zoomVelocity = Vector3.zero;
+			if(Input.GetAxisRaw("Mouse ScrollWheel") > 0)
+				zoomVelocity = Vector3.zero;
 		}
-
 	}
 }

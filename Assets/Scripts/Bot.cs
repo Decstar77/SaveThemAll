@@ -5,17 +5,18 @@ using UnityEngine;
 public class Bot
 {
 
-
+	public BoxCollider boxCollider;
+	public Rigidbody rigidbody;
 	private GameObject gameObject;
 	private GameObject cursor;
-	private MiniBotsManager.BotType type;
 	private BotCharateristics charateristics;
-	public Bot(GameObject bot, Transform StartPosition, MiniBotsManager.BotType type)
+	public Bot(GameObject bot, Transform StartPosition)
 	{
 		gameObject = bot;
 		gameObject.transform.position = StartPosition.position;
-		this.type = type;
 		charateristics = gameObject.GetComponent<BotCharateristics>();
+		boxCollider = gameObject.GetComponent<BoxCollider>();
+		rigidbody = gameObject.GetComponent<Rigidbody>();
 	}
 	public void SetCursor(GameObject cursor)
 	{
@@ -23,7 +24,7 @@ public class Bot
 	}
 	public bool Validate()
 	{
-		if (charateristics == null || gameObject == null || type == MiniBotsManager.BotType.None)
+		if (charateristics == null || gameObject == null || charateristics.BotType == MiniBotsManager.BotType.None)
 		{
 			return false;
 		}
@@ -31,7 +32,7 @@ public class Bot
 	}
 	public void Update()
 	{
-		gameObject.transform.position += Vector3.right * Time.deltaTime;
+		gameObject.transform.position += charateristics.speed * Vector3.right * Time.deltaTime;
 		if (cursor != null)
 		{
 			Vector3 screenCords = Camera.main.WorldToScreenPoint(gameObject.transform.position);
@@ -45,6 +46,11 @@ public class Bot
 	public GameObject GetCursor()
 	{
 		return cursor;
+	}
+	public void JumpLaunch(Vector3 direction, float verticalForce, float horizontalForce)
+	{
+		rigidbody.AddForce(direction * verticalForce, ForceMode.Impulse);
+		rigidbody.AddForce(Vector3.right * horizontalForce, ForceMode.VelocityChange);
 	}
 
 }
